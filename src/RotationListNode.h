@@ -63,7 +63,7 @@ struct RotationListItem
 	float weight = 1.0;
 	bool absolute = false;
 	AxisOrder axisOrder = AxisOrder::xyz;
-	MVector radians = MVector::zero;
+	MVector rotate = MVector::zero;
 
 };
 
@@ -100,20 +100,21 @@ public:
 	static	MObject		weight;
 	static	MObject		absolute;
 	static	MObject		axisOrder;
-	static	MObject		rotationX;
-	static	MObject		rotationY;
-	static	MObject		rotationZ;
-	static	MObject		rotation;
+	static	MObject		rotate;
+	static	MObject		rotateX;
+	static	MObject		rotateY;
+	static	MObject		rotateZ;
 	
-	static	MObject		value;
-	static	MObject		valueX;
-	static	MObject		valueY;
-	static	MObject		valueZ;
+	static	MObject		output;
+	static	MObject		outputX;
+	static	MObject		outputY;
+	static	MObject		outputZ;
 	static	MObject		matrix;
-	
+	static	MObject		inverseMatrix;
+
 	static	MTypeId		id;
 	static	MString		listCategory;
-	static	MString		rotationCategory;
+	static	MString		rotateCategory;
 	static	MString		outputCategory;
 	
 };

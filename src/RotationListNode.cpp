@@ -16,20 +16,21 @@ MObject		RotationList::name;
 MObject		RotationList::weight;
 MObject		RotationList::absolute;
 MObject		RotationList::axisOrder;
-MObject		RotationList::rotation;
-MObject		RotationList::rotationX;
-MObject		RotationList::rotationY;
-MObject		RotationList::rotationZ;
+MObject		RotationList::rotate;
+MObject		RotationList::rotateX;
+MObject		RotationList::rotateY;
+MObject		RotationList::rotateZ;
 
-MObject		RotationList::value;
-MObject		RotationList::valueX;
-MObject		RotationList::valueY;
-MObject		RotationList::valueZ;
+MObject		RotationList::output;
+MObject		RotationList::outputX;
+MObject		RotationList::outputY;
+MObject		RotationList::outputZ;
 MObject		RotationList::matrix;
+MObject		RotationList::inverseMatrix;
 
 MTypeId		RotationList::id(0x0013b1c6);
 MString		RotationList::listCategory("List");
-MString		RotationList::rotationCategory("Rotation");
+MString		RotationList::rotateCategory("Rotate");
 MString		RotationList::outputCategory("Output");
 
 
@@ -84,17 +85,17 @@ Only these values should be used when performing computations!
 		bool normalizeWeights = normalizeWeightsHandle.asBool();
 		short rotateOrder = rotateOrderHandle.asShort();
 		
-		// Collect position entries
+		// Collect rotation entries
 		//
 		unsigned int listCount = listHandle.elementCount();
 		std::vector<RotationListItem> items = std::vector<RotationListItem>(listCount);
 
-		MDataHandle elementHandle, nameHandle, weightHandle, absoluteHandle, axisOrderHandle, rotationHandle, rotationXHandle, rotationYHandle, rotationZHandle;
+		MDataHandle elementHandle, nameHandle, weightHandle, absoluteHandle, axisOrderHandle, rotateHandle, rotateXHandle, rotateYHandle, rotateZHandle;
 		MString name;
 		float weight;
 		bool absolute;
 		AxisOrder axisOrder;
-		double rotationX, rotationY, rotationZ;
+		double rotateX, rotateY, rotateZ;
 		
 		for (unsigned int i = 0; i < listCount; i++)
 		{
@@ -113,25 +114,24 @@ Only these values should be used when performing computations!
 			weightHandle = elementHandle.child(RotationList::weight);
 			absoluteHandle = elementHandle.child(RotationList::absolute);
 			axisOrderHandle = elementHandle.child(RotationList::axisOrder);
-			rotationHandle = elementHandle.child(RotationList::rotation);
-			rotationXHandle = rotationHandle.child(RotationList::rotationX);
-			rotationYHandle = rotationHandle.child(RotationList::rotationY);
-			rotationZHandle = rotationHandle.child(RotationList::rotationZ);
+			rotateHandle = elementHandle.child(RotationList::rotate);
+			rotateXHandle = rotateHandle.child(RotationList::rotateX);
+			rotateYHandle = rotateHandle.child(RotationList::rotateY);
+			rotateZHandle = rotateHandle.child(RotationList::rotateZ);
 			
-
 			// Get values from handles
 			//
 			name = nameHandle.asString();
 			weight = weightHandle.asFloat();
 			absolute = absoluteHandle.asBool();
-			axisOrder = AxisOrder(axisOrderHandle.asInt());
-			rotationX = rotationXHandle.asAngle().asRadians();
-			rotationY = rotationYHandle.asAngle().asRadians();
-			rotationZ = rotationZHandle.asAngle().asRadians();
+			axisOrder = AxisOrder(axisOrderHandle.asShort());
+			rotateX = rotateXHandle.asAngle().asRadians();
+			rotateY = rotateYHandle.asAngle().asRadians();
+			rotateZ = rotateZHandle.asAngle().asRadians();
 			
 			// Assign item to array
 			//
-			items[i] = RotationListItem{ name, weight, absolute, axisOrder, MVector(rotationX, rotationY, rotationZ) };
+			items[i] = RotationListItem{ name, weight, absolute, axisOrder, MVector(rotateX, rotateY, rotateZ) };
 			
 		}
 		
@@ -154,32 +154,37 @@ Only these values should be used when performing computations!
 
 		// Get output data handles
 		//
-		MDataHandle valueXHandle = data.outputValue(RotationList::valueX, &status);
+		MDataHandle outputXHandle = data.outputValue(RotationList::outputX, &status);
 		CHECK_MSTATUS_AND_RETURN_IT(status);
 
-		MDataHandle valueYHandle = data.outputValue(RotationList::valueY, &status);
+		MDataHandle outputYHandle = data.outputValue(RotationList::outputY, &status);
 		CHECK_MSTATUS_AND_RETURN_IT(status);
 
-		MDataHandle valueZHandle = data.outputValue(RotationList::valueZ, &status);
+		MDataHandle outputZHandle = data.outputValue(RotationList::outputZ, &status);
 		CHECK_MSTATUS_AND_RETURN_IT(status);
 
 		MDataHandle matrixHandle = data.outputValue(RotationList::matrix, &status);
 		CHECK_MSTATUS_AND_RETURN_IT(status);
 
+		MDataHandle inverseMatrixHandle = data.outputValue(RotationList::inverseMatrix, &status);
+		CHECK_MSTATUS_AND_RETURN_IT(status);
 
 		// Set output handle values
 		//
-		valueXHandle.setMAngle(MAngle(eulerRotation.x, MAngle::kRadians));
-		valueXHandle.setClean();
+		outputXHandle.setMAngle(MAngle(eulerRotation.x, MAngle::kRadians));
+		outputXHandle.setClean();
 		
-		valueYHandle.setMAngle(MAngle(eulerRotation.y, MAngle::kRadians));
-		valueYHandle.setClean();
+		outputYHandle.setMAngle(MAngle(eulerRotation.y, MAngle::kRadians));
+		outputYHandle.setClean();
 		
-		valueZHandle.setMAngle(MAngle(eulerRotation.z, MAngle::kRadians));
-		valueZHandle.setClean();
+		outputZHandle.setMAngle(MAngle(eulerRotation.z, MAngle::kRadians));
+		outputZHandle.setClean();
 
 		matrixHandle.setMMatrix(matrix);
 		matrixHandle.setClean();
+
+		inverseMatrixHandle.setMMatrix(matrix.inverse());
+		inverseMatrixHandle.setClean();
 
 		// Mark plug as clean
 		//
@@ -229,7 +234,7 @@ Returns the weighted average of the supplied rotation items.
 
 		// Evaluate which method to use
 		//
-		rotationMatrix = RotationList::createRotationMatrix(item.radians, item.axisOrder);
+		rotationMatrix = RotationList::createRotationMatrix(item.rotate, item.axisOrder);
 
 		if (item.absolute)
 		{
@@ -574,36 +579,36 @@ Use this function to define any static attributes.
 	CHECK_MSTATUS(fnEnumAttr.addField("zxz", 9));
 	CHECK_MSTATUS(fnEnumAttr.addToCategory(RotationList::listCategory));
 
-	// ".rotationX" attribute
+	// ".rotateX" attribute
 	//
-	RotationList::rotationX = fnUnitAttr.create("rotationX", "rx", MFnUnitAttribute::kAngle, 0.0, &status);
+	RotationList::rotateX = fnUnitAttr.create("rotateX", "rx", MFnUnitAttribute::kAngle, 0.0, &status);
 	CHECK_MSTATUS_AND_RETURN_IT(status);
 
-	CHECK_MSTATUS(fnUnitAttr.addToCategory(RotationList::rotationCategory));
+	CHECK_MSTATUS(fnUnitAttr.addToCategory(RotationList::rotateCategory));
 	CHECK_MSTATUS(fnUnitAttr.addToCategory(RotationList::listCategory));
 
-	// ".rotationY" attribute
+	// ".rotateY" attribute
 	//
-	RotationList::rotationY = fnUnitAttr.create("rotationY", "ry",  MFnUnitAttribute::kAngle, 0.0, &status);
+	RotationList::rotateY = fnUnitAttr.create("rotateY", "ry",  MFnUnitAttribute::kAngle, 0.0, &status);
 	CHECK_MSTATUS_AND_RETURN_IT(status);
 
-	CHECK_MSTATUS(fnUnitAttr.addToCategory(RotationList::rotationCategory));
+	CHECK_MSTATUS(fnUnitAttr.addToCategory(RotationList::rotateCategory));
 	CHECK_MSTATUS(fnUnitAttr.addToCategory(RotationList::listCategory));
 
-	// ".rotationZ" attribute
+	// ".rotateZ" attribute
 	//
-	RotationList::rotationZ = fnUnitAttr.create("rotationZ", "rz",  MFnUnitAttribute::kAngle, 0.0, &status);
+	RotationList::rotateZ = fnUnitAttr.create("rotateZ", "rz",  MFnUnitAttribute::kAngle, 0.0, &status);
 	CHECK_MSTATUS_AND_RETURN_IT(status);
 
-	CHECK_MSTATUS(fnUnitAttr.addToCategory(RotationList::rotationCategory));
+	CHECK_MSTATUS(fnUnitAttr.addToCategory(RotationList::rotateCategory));
 	CHECK_MSTATUS(fnUnitAttr.addToCategory(RotationList::listCategory));
 
-	// ".rotation" attribute
+	// ".rotate" attribute
 	//
-	RotationList::rotation = fnNumericAttr.create("rotation", "r", RotationList::rotationX, RotationList::rotationY, RotationList::rotationZ, &status);
+	RotationList::rotate = fnNumericAttr.create("rotate", "r", RotationList::rotateX, RotationList::rotateY, RotationList::rotateZ, &status);
 	CHECK_MSTATUS_AND_RETURN_IT(status);
 
-	CHECK_MSTATUS(fnNumericAttr.addToCategory(RotationList::rotationCategory));
+	CHECK_MSTATUS(fnNumericAttr.addToCategory(RotationList::rotateCategory));
 	CHECK_MSTATUS(fnNumericAttr.addToCategory(RotationList::listCategory));
 
 	// ".list" attribute
@@ -615,41 +620,41 @@ Use this function to define any static attributes.
 	CHECK_MSTATUS(fnCompoundAttr.addChild(RotationList::weight));
 	CHECK_MSTATUS(fnCompoundAttr.addChild(RotationList::absolute));
 	CHECK_MSTATUS(fnCompoundAttr.addChild(RotationList::axisOrder));
-	CHECK_MSTATUS(fnCompoundAttr.addChild(RotationList::rotation));
+	CHECK_MSTATUS(fnCompoundAttr.addChild(RotationList::rotate));
 	CHECK_MSTATUS(fnCompoundAttr.setArray(true));
 	CHECK_MSTATUS(fnCompoundAttr.addToCategory(RotationList::listCategory));
 
 	// Output attributes:
-	// ".valueX" attribute
+	// ".outputX" attribute
 	//
-	RotationList::valueX = fnUnitAttr.create("valueX", "vx", MFnUnitAttribute::kAngle, 0.0, &status);
+	RotationList::outputX = fnUnitAttr.create("outputX", "ox", MFnUnitAttribute::kAngle, 0.0, &status);
 	CHECK_MSTATUS_AND_RETURN_IT(status);
 
 	CHECK_MSTATUS(fnUnitAttr.setWritable(false));
 	CHECK_MSTATUS(fnUnitAttr.setStorable(false));
 	CHECK_MSTATUS(fnUnitAttr.addToCategory(RotationList::outputCategory));
 
-	// ".valueY" attribute
+	// ".outputY" attribute
 	//
-	RotationList::valueY = fnUnitAttr.create("valueY", "vy", MFnUnitAttribute::kAngle, 0.0, &status);
+	RotationList::outputY = fnUnitAttr.create("outputY", "oy", MFnUnitAttribute::kAngle, 0.0, &status);
 	CHECK_MSTATUS_AND_RETURN_IT(status);
 
 	CHECK_MSTATUS(fnUnitAttr.setWritable(false));
 	CHECK_MSTATUS(fnUnitAttr.setStorable(false));
 	CHECK_MSTATUS(fnUnitAttr.addToCategory(RotationList::outputCategory));
 
-	// ".valueZ" attribute
+	// ".outputZ" attribute
 	//
-	RotationList::valueZ = fnUnitAttr.create("valueZ", "vz", MFnUnitAttribute::kAngle, 0.0, &status);
+	RotationList::outputZ = fnUnitAttr.create("outputZ", "oz", MFnUnitAttribute::kAngle, 0.0, &status);
 	CHECK_MSTATUS_AND_RETURN_IT(status);
 
 	CHECK_MSTATUS(fnUnitAttr.setWritable(false));
 	CHECK_MSTATUS(fnUnitAttr.setStorable(false));
 	CHECK_MSTATUS(fnUnitAttr.addToCategory(RotationList::outputCategory));
 
-	// ".value" attribute
+	// ".output" attribute
 	//
-	RotationList::value = fnNumericAttr.create("value", "v", RotationList::valueX, RotationList::valueY, RotationList::valueZ, &status);
+	RotationList::output = fnNumericAttr.create("output", "o", RotationList::outputX, RotationList::outputY, RotationList::outputZ, &status);
 	CHECK_MSTATUS_AND_RETURN_IT(status);
 
 	CHECK_MSTATUS(fnNumericAttr.setWritable(false));
@@ -665,6 +670,15 @@ Use this function to define any static attributes.
 	CHECK_MSTATUS(fnMatrixAttr.setStorable(false));
 	CHECK_MSTATUS(fnMatrixAttr.addToCategory(RotationList::outputCategory));
 
+	// ".inverseMatrix" attribute
+	//
+	RotationList::inverseMatrix = fnMatrixAttr.create("inverseMatrix", "im", MFnMatrixAttribute::kDouble, &status);
+	CHECK_MSTATUS_AND_RETURN_IT(status);
+
+	CHECK_MSTATUS(fnMatrixAttr.setWritable(false));
+	CHECK_MSTATUS(fnMatrixAttr.setStorable(false));
+	CHECK_MSTATUS(fnMatrixAttr.addToCategory(RotationList::outputCategory));
+
 	// Add attributes to node
 	//
 	CHECK_MSTATUS(RotationList::addAttribute(RotationList::active));
@@ -672,40 +686,35 @@ Use this function to define any static attributes.
 	CHECK_MSTATUS(RotationList::addAttribute(RotationList::rotateOrder));
 	CHECK_MSTATUS(RotationList::addAttribute(RotationList::list));
 
-	CHECK_MSTATUS(RotationList::addAttribute(RotationList::value));
+	CHECK_MSTATUS(RotationList::addAttribute(RotationList::output));
 	CHECK_MSTATUS(RotationList::addAttribute(RotationList::matrix));
+	CHECK_MSTATUS(RotationList::addAttribute(RotationList::inverseMatrix));
 
 	// Define attribute relationships
 	//
-	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::active, RotationList::valueX));
-	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::normalizeWeights, RotationList::valueX));
-	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::rotateOrder, RotationList::valueX));
-	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::weight, RotationList::valueX));
-	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::absolute, RotationList::valueX));
-	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::axisOrder, RotationList::valueX));
-	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::rotationX, RotationList::valueX));
-	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::rotationY, RotationList::valueX));
-	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::rotationZ, RotationList::valueX));
+	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::active, RotationList::outputX));
+	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::normalizeWeights, RotationList::outputX));
+	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::rotateOrder, RotationList::outputX));
+	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::weight, RotationList::outputX));
+	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::absolute, RotationList::outputX));
+	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::axisOrder, RotationList::outputX));
+	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::rotateX, RotationList::outputX));
 
-	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::active, RotationList::valueY));
-	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::normalizeWeights, RotationList::valueY));
-	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::rotateOrder, RotationList::valueY));
-	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::weight, RotationList::valueY));
-	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::absolute, RotationList::valueY));
-	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::axisOrder, RotationList::valueY));
-	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::rotationX, RotationList::valueY));
-	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::rotationY, RotationList::valueY));
-	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::rotationZ, RotationList::valueY));
+	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::active, RotationList::outputY));
+	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::normalizeWeights, RotationList::outputY));
+	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::rotateOrder, RotationList::outputY));
+	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::weight, RotationList::outputY));
+	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::absolute, RotationList::outputY));
+	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::axisOrder, RotationList::outputY));
+	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::rotateY, RotationList::outputY));
 
-	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::active, RotationList::valueZ));
-	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::normalizeWeights, RotationList::valueZ));
-	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::rotateOrder, RotationList::valueZ));
-	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::weight, RotationList::valueZ));
-	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::absolute, RotationList::valueZ));
-	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::axisOrder, RotationList::valueZ));
-	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::rotationX, RotationList::valueZ));
-	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::rotationY, RotationList::valueZ));
-	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::rotationZ, RotationList::valueZ));
+	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::active, RotationList::outputZ));
+	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::normalizeWeights, RotationList::outputZ));
+	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::rotateOrder, RotationList::outputZ));
+	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::weight, RotationList::outputZ));
+	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::absolute, RotationList::outputZ));
+	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::axisOrder, RotationList::outputZ));
+	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::rotateZ, RotationList::outputZ));
 
 	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::active, RotationList::matrix));
 	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::normalizeWeights, RotationList::matrix));
@@ -713,9 +722,19 @@ Use this function to define any static attributes.
 	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::weight, RotationList::matrix));
 	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::absolute, RotationList::matrix));
 	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::axisOrder, RotationList::matrix));
-	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::rotationX, RotationList::matrix));
-	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::rotationY, RotationList::matrix));
-	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::rotationZ, RotationList::matrix));
+	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::rotateX, RotationList::matrix));
+	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::rotateY, RotationList::matrix));
+	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::rotateZ, RotationList::matrix));
+
+	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::active, RotationList::inverseMatrix));
+	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::normalizeWeights, RotationList::inverseMatrix));
+	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::rotateOrder, RotationList::inverseMatrix));
+	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::weight, RotationList::inverseMatrix));
+	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::absolute, RotationList::inverseMatrix));
+	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::axisOrder, RotationList::inverseMatrix));
+	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::rotateX, RotationList::inverseMatrix));
+	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::rotateY, RotationList::inverseMatrix));
+	CHECK_MSTATUS(RotationList::attributeAffects(RotationList::rotateZ, RotationList::inverseMatrix));
 
 	return status;
 
